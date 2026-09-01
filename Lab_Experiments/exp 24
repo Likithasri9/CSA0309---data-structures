@@ -1,0 +1,57 @@
+24. Minimum Spanning Tree – Prim's Algorithm
+#include <stdio.h>
+
+#define INF 999
+#define V 5
+
+int main() {
+    int graph[V][V] = {
+        {0,2,3,INF,INF},
+        {2,0,1,4,INF},
+        {3,1,0,5,6},
+        {INF,4,5,0,7},
+        {INF,INF,6,7,0}
+    };
+
+    int selected[V] = {0};
+    int edges=0, total=0;
+    int min, x, y, i, j;
+
+    selected[0] = 1;
+
+    printf("Edges in MST:\n");
+
+    while(edges < V-1) {
+        min = INF;
+
+        for(i=0; i<V; i++) {
+            if(selected[i]) {
+                for(j=0; j<V; j++) {
+                    if(!selected[j] && graph[i][j] < min) {
+                        min = graph[i][j];
+                        x = i;
+                        y = j;
+                    }
+                }
+            }
+        }
+
+        printf("%d - %d = %d\n", x, y, min);
+        total += min;
+        selected[y] = 1;
+        edges++;
+    }
+
+    printf("Total cost = %d", total);
+
+    return 0;
+}
+
+Output:
+
+Edges in MST:
+0 - 1 = 2
+1 - 2 = 1
+1 - 3 = 4
+2 - 4 = 6
+Total cost = 13
