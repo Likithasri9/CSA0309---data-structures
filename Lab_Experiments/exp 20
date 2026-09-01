@@ -1,0 +1,244 @@
+20. AVL Tree – Insert, Delete and Search
+#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int key, height;
+    struct Node *left, *right;
+};
+
+int height(struct Node *n) {
+    if(n == NULL)
+        return 0;
+    return n->height;
+}
+
+int max(int a, int b) {
+    return a > b ? a : b;
+}
+
+struct Node* newNode(int key) {
+    struct Node* n = malloc(sizeof(struct Node));
+    n->key = key;
+    n->height = 1;
+    n->left = n->right = NULL;
+    return n;
+}
+
+struct Node* rightRotate(struct Node *y) {
+    struct Node *x = y->left;
+    struct Node *t = x->right;
+
+    x->right = y;
+    y->left = t;
+
+    y->height = max(height(y->left),height(y->right))+1;
+    x->height = max(height(x->left),height(x->right))+1;
+
+    return x;
+}
+
+struct Node* leftRotate(struct Node *x) {
+    struct Node *y = x->right;
+    struct Node *t = y->left;
+
+    y->left = x;
+    x->right = t;
+
+    x->height = max(height(x->left),height(x->right))+1;
+    y->height = max(height(y->left),height(y->right))+1;
+
+    return y;
+}
+
+int balance(struct Node *n) {
+    if(n == NULL)
+        return 0;
+    return height(n->left)-height(n->right);
+}
+
+struct Node* insert(struct Node* root, int key) {
+    if(root == NULL)
+        return newNode(key);
+
+    if(key < root->key)
+        root->left = insert(root->left,key);
+    else if(key > root->key)
+        root->right = insert(root->right,key);
+    else
+        return root;
+
+    root->height = 1 + max(height(root->left),height(root->right));
+
+    if(balance(root)>1 && key<root->left->key)
+        return rightRotate(root);
+
+    if(balance(root)<-1 && key>root->right->key)
+        return leftRotate(root);
+
+    if(balance(root)>1 && key>root->left->key) {
+        root->left=leftRotate(root->left);
+        return rightRotate(root);
+    }
+
+    if(balance(root)<-1 && key<root->right->key) {
+        root->right=rightRotate(root->right);
+        return leftRotate(root);
+    }
+
+    return root;
+}
+
+struct Node* minNode(struct Node* root) {
+    struct Node* temp=root;
+
+    while(temp->left != NULL)
+        temp=temp->left;
+
+    return temp;
+}
+
+struct Node* deleteNode(struct Node* root, int key) {
+    if(root == NULL)
+        return root;
+
+    if(key < root->key)
+        root->left=deleteNode(root->left,key);
+    else if(key > root->key)
+        root->right=deleteNode(root->right,key);
+    else {
+        if(root->left == NULL || root->right == NULL) {
+            struct Node* temp = root->left ? root->left : root->right;
+
+            if(temp == NULL) {
+                temp=root;
+                root=NULL;
+            }
+            else
+                *root=*temp;
+
+            free(temp);
+        }
+        else {
+            struct Node* temp=minNode(root->right);
+            root->key=temp->key;
+            root->right=deleteNode(root->right,temp->key);
+        }
+    }
+
+    if(root == NULL)
+        return root;
+
+    root->height=1+max(height(root->left),height(root->right));
+
+    if(balance(root)>1 && balance(root->left)>=0)
+        return rightRotate(root);
+
+    if(balance(root)>1 && balance(root->left)<0) {
+        root->left=leftRotate(root->left);
+        return rightRotate(root);
+    }
+
+    if(balance(root)<-1 && balance(root->right)<=0)
+        return leftRotate(root);
+
+    if(balance(root)<-1 && balance(root->right)>0) {
+        root->right=rightRotate(root->right);
+        return leftRotate(root);
+    }
+
+    return root;
+}
+
+void search(struct Node* root,int key) {
+    if(root==NULL) {
+        printf("Element not found\n");
+        return;
+    }
+
+    if(root->key==key)
+        printf("Element found\n");
+    else if(key<root->key)
+        search(root->left,key);
+    else
+        search(root->right,key);
+}
+
+void inorder(struct Node* root) {
+    if(root) {
+        inorder(root->left);
+        printf("%d ",root->key);
+        inorder(root->right);
+    }
+}
+
+int main() {
+    struct Node* root=NULL;
+    int choice,key;
+
+    while(1) {
+        printf("\n1.Insert\n2.Delete\n3.Search\n4.Display\n5.Exit\n");
+        printf("Enter choice: ");
+        scanf("%d",&choice);
+
+        switch(choice) {
+            case 1:
+                printf("Enter element: ");
+                scanf("%d",&key);
+                root=insert(root,key);
+                break;
+
+            case 2:
+                printf("Enter element: ");
+                scanf("%d",&key);
+                root=deleteNode(root,key);
+                break;
+
+            case 3:
+                printf("Enter element: ");
+                scanf("%d",&key);
+                search(root,key);
+                break;
+
+            case 4:
+                printf("Inorder: ");
+                inorder(root);
+                printf("\n");
+                break;
+
+            case 5:
+                exit(0);
+        }
+    }
+}
+
+Output:
+
+1.Insert
+2.Delete
+3.Search
+4.Display
+5.Exit
+Enter choice: 1
+Enter element: 30
+
+Enter choice: 1
+Enter element: 20
+
+Enter choice: 1
+Enter element: 10
+
+Enter choice: 4
+Inorder: 10 20 30
+
+Enter choice: 3
+Enter element: 20
+Element found
+
+Enter choice: 2
+Enter element: 10
+
+Enter choice: 4
+Inorder: 20 30
+
+Enter choice: 5
