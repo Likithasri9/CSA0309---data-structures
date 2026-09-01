@@ -1,0 +1,118 @@
+10. Linked List Operations
+
+Here we perform Insert, Delete and Display.
+
+#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int data;
+    struct Node *next;
+};
+
+struct Node *head = NULL;
+
+void insert() {
+    int value;
+    struct Node *newNode;
+
+    newNode = (struct Node*)malloc(sizeof(struct Node));
+
+    printf("Enter value: ");
+    scanf("%d", &value);
+
+    newNode->data = value;
+    newNode->next = head;
+    head = newNode;
+}
+
+void delete() {
+    struct Node *temp;
+
+    if(head == NULL) {
+        printf("List is empty\n");
+        return;
+    }
+
+    temp = head;
+    head = head->next;
+    free(temp);
+
+    printf("Node deleted\n");
+}
+
+void display() {
+    struct Node *temp = head;
+
+    if(head == NULL) {
+        printf("List is empty\n");
+        return;
+    }
+
+    printf("Linked List: ");
+
+    while(temp != NULL) {
+        printf("%d -> ", temp->data);
+        temp = temp->next;
+    }
+
+    printf("NULL\n");
+}
+
+int main() {
+    int choice;
+
+    while(1) {
+        printf("\n1. Insert\n2. Delete\n3. Display\n4. Exit\n");
+        printf("Enter choice: ");
+        scanf("%d", &choice);
+
+        switch(choice) {
+            case 1:
+                insert();
+                break;
+
+            case 2:
+                delete();
+                break;
+
+            case 3:
+                display();
+                break;
+
+            case 4:
+                exit(0);
+
+            default:
+                printf("Invalid choice\n");
+        }
+    }
+
+    return 0;
+}
+
+Output:
+
+1. Insert
+2. Delete
+3. Display
+4. Exit
+Enter choice: 1
+Enter value: 10
+
+Enter choice: 1
+Enter value: 20
+
+Enter choice: 1
+Enter value: 30
+
+Enter choice: 3
+Linked List: 30 -> 20 -> 10 -> NULL
+
+Enter choice: 2
+Node deleted
+
+Enter choice: 3
+Linked List: 20 -> 10 -> NULL
+
+Enter choice: 4
