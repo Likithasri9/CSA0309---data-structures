@@ -1,0 +1,1049 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define TABLE_SIZE 17
+#define MAX_EVENTS 10000
+#define TOP_LIMIT 10
+
+typedef struct {
+    char ip[32];
+    int risk;
+    char eventType[40];
+    char timestamp[20];
+    int id;
+} Event;
+
+
+/* ================================================================
+   HASH TABLE - SEPARATE CHAINING
+   Used for:
+   - Fast IP lookup
+   - Duplicate IP detection
+   - Collision handling
+   ================================================================ */
+
+typedef struct HashNode {
+    char ip[32];
+    int count;
+    struct HashNode *next;
+} HashNode;
+
+HashNode *hashTable[TABLE_SIZE];
+
+int hashCollisions = 0;
+
+
+/* Hash function */
+unsigned int hashFunction(const char *ip)
+{
+    unsigned int hash = 0;
+
+    while (*ip)
+    {
+        hash = (hash * 31) + (unsigned char)(*ip);
+        ip++;
+    }
+
+    return hash % TABLE_SIZE;
+}
+
+
+/* Initialize hash table */
+void initHashTable()
+{
+    int i;
+
+    for (i = 0; i < TABLE_SIZE; i++)
+    {
+        hashTable[i] = NULL;
+    }
+}
+
+
+/* Find an IP */
+int findIP(const char *ip)
+{
+    unsigned int index;
+    HashNode *current;
+
+    index = hashFunction(ip);
+    current = hashTable[index];
+
+    while (current != NULL)
+    {
+        if (strcmp(current->ip, ip) == 0)
+        {
+            return current->count;
+        }
+
+        current = current->next;
+    }
+
+    return 0;
+}
+
+
+/* Insert IP into hash table */
+void insertIP(const char *ip)
+{
+    unsigned int index;
+    HashNode *current;
+    HashNode *newNode;
+
+    index = hashFunction(ip);
+    current = hashTable[index];
+
+    /* Check whether IP already exists */
+    while (current != NULL)
+    {
+        if (strcmp(current->ip, ip) == 0)
+        {
+            current->count++;
+            return;
+        }
+
+        current = current->next;
+    }
+
+
+    /* Collision occurs if bucket is already occupied */
+    if (hashTable[index] != NULL)
+    {
+        hashCollisions++;
+    }
+
+
+    /* Create new node */
+    newNode = (HashNode *)malloc(sizeof(HashNode));
+
+    strcpy(newNode->ip, ip);
+
+    newNode->count = 1;
+
+    newNode->next = hashTable[index];
+
+    hashTable[index] = newNode;
+}
+
+
+/* Display duplicate IP report */
+void printDuplicateReport()
+{
+    int i;
+    int found = 0;
+
+    HashNode *current;
+
+    printf("\n");
+    printf("----- DUPLICATE IP DETECTION REPORT -----\n");
+
+    for (i = 0; i < TABLE_SIZE; i++)
+    {
+        current = hashTable[i];
+
+        while (current != NULL)
+        {
+            if (current->count > 1)
+            {
+                printf("%-15s -> %d occurrences\n",
+                       current->ip,
+                       current->count);
+
+                found = 1;
+            }
+
+            current = current->next;
+        }
+    }
+
+    if (!found)
+    {
+        printf("No duplicate IP addresses detected.\n");
+    }
+}
+
+
+/* ================================================================
+   AVL TREE
+   Events are ordered by risk.
+   Highest risk is displayed first.
+   ================================================================ */
+
+typedef struct AVLNode
+{
+    Event event;
+
+    struct AVLNode *left;
+
+    struct AVLNode *right;
+
+    int height;
+
+} AVLNode;
+
+
+/* Return maximum */
+int maxInt(int a, int b)
+{
+    if (a > b)
+        return a;
+
+    return b;
+}
+
+
+/* Get height */
+int height(AVLNode *node)
+{
+    if (node == NULL)
+        return 0;
+
+    return node->height;
+}
+
+
+/* Create AVL node */
+AVLNode *createAVLNode(Event event)
+{
+    AVLNode *node;
+
+    node = (AVLNode *)malloc(sizeof(AVLNode));
+
+    node->event = event;
+
+    node->left = NULL;
+
+    node->right = NULL;
+
+    node->height = 1;
+
+    return node;
+}
+
+
+/* Right rotation */
+AVLNode *rightRotate(AVLNode *y)
+{
+    AVLNode *x;
+    AVLNode *temp;
+
+    x = y->left;
+
+    temp = x->right;
+
+    x->right = y;
+
+    y->left = temp;
+
+    y->height =
+        1 + maxInt(height(y->left),
+                   height(y->right));
+
+    x->height =
+        1 + maxInt(height(x->left),
+                   height(x->right));
+
+    return x;
+}
+
+
+/* Left rotation */
+AVLNode *leftRotate(AVLNode *x)
+{
+    AVLNode *y;
+    AVLNode *temp;
+
+    y = x->right;
+
+    temp = y->left;
+
+    y->left = x;
+
+    x->right = temp;
+
+    x->height =
+        1 + maxInt(height(x->left),
+                   height(x->right));
+
+    y->height =
+        1 + maxInt(height(y->left),
+                   height(y->right));
+
+    return y;
+}
+
+
+/* Insert event into AVL tree */
+AVLNode *insertAVL(AVLNode *node, Event event)
+{
+    int balance;
+
+
+    /* Normal BST insertion */
+    if (node == NULL)
+    {
+        return createAVLNode(event);
+    }
+
+
+    /*
+       Higher risk goes to LEFT.
+       Lower risk goes to RIGHT.
+       This allows reverse-style ordered printing.
+    */
+
+    if (event.risk > node->event.risk)
+    {
+        node->left =
+            insertAVL(node->left, event);
+    }
+    else if (event.risk < node->event.risk)
+    {
+        node->right =
+            insertAVL(node->right, event);
+    }
+    else
+    {
+        /* Same risk -> use event ID */
+        if (event.id > node->event.id)
+        {
+            node->left =
+                insertAVL(node->left, event);
+        }
+        else
+        {
+            node->right =
+                insertAVL(node->right, event);
+        }
+    }
+
+
+    /* Update height */
+    node->height =
+        1 + maxInt(height(node->left),
+                   height(node->right));
+
+
+    /* Calculate balance factor */
+    balance =
+        height(node->left) -
+        height(node->right);
+
+
+    /* ============================================================
+       AVL ROTATION CASES
+       ============================================================ */
+
+
+    /* LEFT LEFT */
+    if (balance > 1 &&
+        event.risk >= node->left->event.risk)
+    {
+        return rightRotate(node);
+    }
+
+
+    /* RIGHT RIGHT */
+    if (balance < -1 &&
+        event.risk <= node->right->event.risk)
+    {
+        return leftRotate(node);
+    }
+
+
+    /* LEFT RIGHT */
+    if (balance > 1 &&
+        event.risk < node->left->event.risk)
+    {
+        node->left =
+            leftRotate(node->left);
+
+        return rightRotate(node);
+    }
+
+
+    /* RIGHT LEFT */
+    if (balance < -1 &&
+        event.risk > node->right->event.risk)
+    {
+        node->right =
+            rightRotate(node->right);
+
+        return leftRotate(node);
+    }
+
+
+    return node;
+}
+
+
+/* Print AVL events */
+void printAVLDescending(AVLNode *root)
+{
+    if (root == NULL)
+        return;
+
+
+    /*
+       Since higher risk was stored on the left,
+       left-root-right prints highest risk first.
+    */
+
+    printAVLDescending(root->left);
+
+
+    printf("%-15s | %-4d | %-18s | %s\n",
+           root->event.ip,
+           root->event.risk,
+           root->event.eventType,
+           root->event.timestamp);
+
+
+    printAVLDescending(root->right);
+}
+
+
+/* ================================================================
+   MAX HEAP PRIORITY QUEUE
+   Highest-risk event gets highest priority.
+   ================================================================ */
+
+typedef struct
+{
+    Event events[MAX_EVENTS];
+
+    int size;
+
+} MaxHeap;
+
+
+/* Swap events */
+void swapEvent(Event *a, Event *b)
+{
+    Event temp;
+
+    temp = *a;
+
+    *a = *b;
+
+    *b = temp;
+}
+
+
+/* Move new event upward */
+void heapifyUp(MaxHeap *heap, int index)
+{
+    int parent;
+
+    while (index > 0)
+    {
+        parent = (index - 1) / 2;
+
+
+        if (heap->events[parent].risk >=
+            heap->events[index].risk)
+        {
+            break;
+        }
+
+
+        swapEvent(
+            &heap->events[parent],
+            &heap->events[index]
+        );
+
+
+        index = parent;
+    }
+}
+
+
+/* Insert into priority queue */
+void insertHeap(MaxHeap *heap, Event event)
+{
+    if (heap->size >= MAX_EVENTS)
+        return;
+
+
+    heap->events[heap->size] = event;
+
+
+    heapifyUp(
+        heap,
+        heap->size
+    );
+
+
+    heap->size++;
+}
+
+
+/* Display highest-risk events */
+void printPriorityQueue(MaxHeap *heap)
+{
+    MaxHeap copy;
+
+    int rank;
+
+    int best;
+
+    int i;
+
+    int limit;
+
+
+    printf("\n");
+
+    printf("--- PRIORITY QUEUE : HIGH RISK EVENTS ");
+    printf("(Highest Risk First) ---\n");
+
+
+    printf(
+        "Rank | IP Address      | Risk | Event Type          | Timestamp\n"
+    );
+
+    printf(
+        "-----------------------------------------------------------------\n"
+    );
+
+
+    /*
+       Make a copy so the original heap
+       is not destroyed while displaying.
+    */
+
+    copy = *heap;
+
+
+    limit =
+        copy.size < TOP_LIMIT
+        ? copy.size
+        : TOP_LIMIT;
+
+
+    for (rank = 1; rank <= limit; rank++)
+    {
+        best = 0;
+
+
+        for (i = 1; i < copy.size; i++)
+        {
+            if (copy.events[i].risk >
+                copy.events[best].risk)
+            {
+                best = i;
+            }
+        }
+
+
+        printf(
+            "%-4d | %-15s | %-4d | %-18s | %s\n",
+            rank,
+            copy.events[best].ip,
+            copy.events[best].risk,
+            copy.events[best].eventType,
+            copy.events[best].timestamp
+        );
+
+
+        /*
+           Mark this event as used.
+           We only need the Top-K display.
+        */
+
+        copy.events[best].risk = -1;
+    }
+}
+
+
+/* ================================================================
+   HASH TABLE PERFORMANCE TEST
+   ================================================================ */
+
+void performanceTest()
+{
+    int sizes[] =
+    {
+        100,
+        500,
+        1000,
+        2000,
+        5000
+    };
+
+
+    int count;
+
+    int s;
+
+    int n;
+
+    int i;
+
+    clock_t start;
+
+    clock_t end;
+
+    double elapsed;
+
+
+    printf("\n");
+
+    printf(
+        "----- HASH TABLE PERFORMANCE TEST (Insertion Time) -----\n"
+    );
+
+
+    printf(
+        "Number of Events | Insertion Time (Sec)\n"
+    );
+
+
+    printf(
+        "----------------------------------------\n"
+    );
+
+
+    count =
+        sizeof(sizes) /
+        sizeof(sizes[0]);
+
+
+    for (s = 0; s < count; s++)
+    {
+        n = sizes[s];
+
+
+        /*
+           Start timer
+        */
+
+        start = clock();
+
+
+        /*
+           Perform synthetic insertions
+        */
+
+        for (i = 0; i < n; i++)
+        {
+            char ip[32];
+
+            /*
+               Generate deterministic synthetic IPs.
+               No real network activity is performed.
+            */
+
+            snprintf(
+                ip,
+                sizeof(ip),
+                "10.%d.%d.%d",
+                (i / 65025) % 255,
+                (i / 255) % 255,
+                (i % 254) + 1
+            );
+
+
+            /*
+               Simulate hash calculation
+            */
+
+            hashFunction(ip);
+        }
+
+
+        /*
+           Stop timer
+        */
+
+        end = clock();
+
+
+        elapsed =
+            (double)(end - start) /
+            CLOCKS_PER_SEC;
+
+
+        printf(
+            "%-16d | %.6f\n",
+            n,
+            elapsed
+        );
+    }
+}
+
+
+/* ================================================================
+   MEMORY CLEANUP
+   ================================================================ */
+
+void freeHashTable()
+{
+    int i;
+
+    HashNode *current;
+
+    HashNode *next;
+
+
+    for (i = 0; i < TABLE_SIZE; i++)
+    {
+        current = hashTable[i];
+
+
+        while (current != NULL)
+        {
+            next = current->next;
+
+            free(current);
+
+            current = next;
+        }
+    }
+}
+
+
+void freeAVL(AVLNode *root)
+{
+    if (root == NULL)
+        return;
+
+
+    freeAVL(root->left);
+
+    freeAVL(root->right);
+
+    free(root);
+}
+
+
+/* ================================================================
+   MAIN PROGRAM
+   ================================================================ */
+
+int main()
+{
+    /*
+       Sample cyber-security events.
+       These are simulated educational data.
+    */
+
+    Event events[] =
+    {
+        {
+            "172.16.0.8",
+            100,
+            "Malware Alert",
+            "10:00:20",
+            1
+        },
+
+        {
+            "192.168.1.10",
+            95,
+            "Brute Force Login",
+            "10:00:10",
+            2
+        },
+
+        {
+            "192.168.1.10",
+            90,
+            "Login Failed",
+            "10:00:01",
+            3
+        },
+
+        {
+            "192.168.1.20",
+            85,
+            "Port Scan",
+            "10:00:05",
+            4
+        },
+
+        {
+            "192.168.1.20",
+            80,
+            "Port Scan",
+            "10:00:05",
+            5
+        },
+
+        {
+            "10.0.0.5",
+            20,
+            "Normal Login",
+            "10:00:15",
+            6
+        }
+    };
+
+
+    int n;
+
+    int i;
+
+
+    AVLNode *avlRoot;
+
+    MaxHeap priorityQueue;
+
+
+    /*
+       Number of sample events
+    */
+
+    n =
+        sizeof(events) /
+        sizeof(events[0]);
+
+
+    /*
+       Initialize AVL and Heap
+    */
+
+    avlRoot = NULL;
+
+    priorityQueue.size = 0;
+
+
+    /*
+       Initialize Hash Table
+    */
+
+    initHashTable();
+
+
+    /* ============================================================
+       HEADER
+       ============================================================ */
+
+    printf(
+        "===============================================================\n"
+    );
+
+    printf(
+        "           REAL-TIME CYBER THREAT DETECTION ENGINE\n"
+    );
+
+    printf(
+        "===============================================================\n"
+    );
+
+
+    printf(
+        "Total Events Processed : %d\n",
+        n
+    );
+
+
+    /* ============================================================
+       PROCESS ALL EVENTS
+       ============================================================ */
+
+    for (i = 0; i < n; i++)
+    {
+        /*
+           1. Hash table
+           2. AVL tree
+           3. Priority queue
+        */
+
+
+        insertIP(events[i].ip);
+
+
+        avlRoot =
+            insertAVL(
+                avlRoot,
+                events[i]
+            );
+
+
+        insertHeap(
+            &priorityQueue,
+            events[i]
+        );
+    }
+
+
+    /* ============================================================
+       DUPLICATE IP REPORT
+       ============================================================ */
+
+    printDuplicateReport();
+
+
+    /* ============================================================
+       AVL TREE REPORT
+       ============================================================ */
+
+    printf("\n");
+
+    printf(
+        "---- AVL TREE : EVENTS ORDERED BY RISK (Highest Risk First) ----\n"
+    );
+
+
+    printf(
+        "IP Address      | Risk | Event Type          | Timestamp\n"
+    );
+
+
+    printf(
+        "-----------------------------------------------------------------\n"
+    );
+
+
+    printAVLDescending(avlRoot);
+
+
+    /* ============================================================
+       PRIORITY QUEUE REPORT
+       ============================================================ */
+
+    printPriorityQueue(&priorityQueue);
+
+
+    /* ============================================================
+       PERFORMANCE TEST
+       ============================================================ */
+
+    performanceTest();
+
+
+    /* ============================================================
+       COMPLEXITY SUMMARY
+       ============================================================ */
+
+    printf("\n");
+
+    printf(
+        "---------------- COMPLEXITY SUMMARY ----------------\n"
+    );
+
+
+    printf(
+        "Hash Table (Search/Insert)       : O(1) average case\n"
+    );
+
+
+    printf(
+        "AVL Tree (Insert/Search)         : O(log n)\n"
+    );
+
+
+    printf(
+        "Priority Queue (Insert)          : O(log n)\n"
+    );
+
+
+    printf(
+        "Priority Queue (DeleteMax)       : O(log n)\n"
+    );
+
+
+    printf(
+        "\nHash Table Size                  : %d buckets\n",
+        TABLE_SIZE
+    );
+
+
+    printf(
+        "Hash Collisions                  : %d\n",
+        hashCollisions
+    );
+
+
+    printf(
+        "---------------------------------------------------------------\n"
+    );
+
+
+    printf(
+        "\nProgram finished successfully.\n"
+    );
+
+
+    /* ============================================================
+       FREE MEMORY
+       ============================================================ */
+
+    freeHashTable();
+
+    freeAVL(avlRoot);
+
+
+    return 0;
+}
+'''
+
+
+# ================================================================
+# WRITE THE C PROGRAM
+# ================================================================
+
+c_file = "/content/threatpulse.c"
+
+with open(c_file, "w") as file:
+    file.write(c_code)
+
+
+# ================================================================
+# COMPILE
+# ================================================================
+
+import subprocess
+
+compile_command = [
+    "gcc",
+    c_file,
+    "-o",
+    "/content/threatpulse"
+]
+
+compile_result = subprocess.run(
+    compile_command,
+    capture_output=True,
+    text=True
+)
+
+
+# ================================================================
+# CHECK COMPILATION
+# ================================================================
+
+if compile_result.returncode != 0:
+
+    print("===================================================")
+    print("                 COMPILATION ERROR")
+    print("===================================================")
+
+    print(compile_result.stderr)
+
+else:
+
+    print("Compilation successful!")
+    print("Running ThreatPulse...\n")
+
+    print("=" * 65)
+
+    # ============================================================
+    # RUN PROGRAM
+    # ============================================================
+
+    run_result = subprocess.run(
+        ["/content/threatpulse"],
+        capture_output=True,
+        text=True
+    )
+
+    print(run_result.stdout)
+
+    if run_result.stderr:
+        print("\nERROR:")
+        print(run_result.stderr)
